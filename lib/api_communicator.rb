@@ -2,34 +2,40 @@ require 'rest-client'
 require 'JSON'
 require 'pry'
 
-def get_character_movies_from_api(character)
-  #make the web request
-  all_characters = RestClient.get('http://www.swapi.co/api/people/')
-  character_hash = JSON.parse(all_characters)
-  
-  # iterate ove the character hash to find the collection of `films` for the given
-  #   `character`
-  character_details = character_hash["results"].find {|queried_char| queried_char["name"].downcase == character}
-  film_list = character_details["films"]
- 
-  # collect those film API urls, make a web request to each URL to get the info
-  #  for that film
-  film_list.map do |film| 
-    film_JSON = RestClient.get(film)
-    film_hash = JSON.parse(film_JSON)
+def url_to_hash(url)
+  data_as_json = RestClient.get(url)
+  data_as_hash = JSON.parse(data_as_json)
+end
+
+def find_character(character)
+  page = "http://www.swapi.co/api/people/"
+  while page != nil do
+    character_hash = url_to_hash(page)
+
+    character_details = character_hash["results"].find {|queried_char| queried_char["name"].downcase == character}
+    break if character_details != nil
+
+    page = character_hash["next"]
   end
-  # return value of this method should be collection of info about each film. 
-  #  i.e. an array of hashes in which each hash reps a given film
-  # this collection will be the argument given to `parse_character_movies`
-  #  and that method will do some nice presentation stuff: puts out a list 
-  #  of movies by title. play around with puts out other info about a given film.
+
+  character_details
+end
+
+def get_character_movies_from_api(character)
+  film_list = find_character(character)["films"]
+
+  film_list.map do |film_url| 
+    url_to_hash(film_url)
+  end
 end
 
 def parse_character_movies(films_array)
-  films_array.each_with_index do |film, i|
-    puts "#{i + 1}. #{film["title"]}"
+  film_list = films_array.each_with_object([]) do |film, film_list|
+    film_list << "Episode #{film["episode_id"]}: #{film["title"]}"
   end
 
+  puts "\nFilms:"
+  puts film_list.sort
   # some iteration magic and puts out the movies in a nice list
 end
 
